@@ -1,0 +1,44 @@
+server:
+  host: 127.0.0.1
+  llmPort: 8080
+  adminPort: 3001
+  uiPort: 3000
+  adminApiKey: ${ADMIN_API_KEY}
+
+clients:
+  - id: claude-cli
+    apiKey: ${CLIENT_KEY_CLAUDE}
+    provider: anthropic
+  - id: kilo
+    apiKey: ${CLIENT_KEY_KILO}
+    provider: openai
+
+providers:
+  anthropic:
+    type: anthropic
+    apiKey: ${ANTHROPIC_API_KEY}
+    baseURL: https://api.anthropic.com/v1
+
+  openai:
+    type: openai
+    apiKey: ${OPENAI_API_KEY}
+    baseURL: https://api.openai.com/v1
+
+  lmstudio:
+    type: openai
+    apiKey: ""
+    baseURL: http://localhost:1234/v1
+
+modelAliases:
+  anthropic:
+    claude-3-5-sonnet-latest: claude-3-5-sonnet-20241022
+    claude-3-5-haiku-latest: claude-3-5-haiku-20241022
+  openai:
+    gpt-4: gpt-4
+    gpt-4o: gpt-4o
+  lmstudio:
+    llama-3-8b: llama-3-8b-instruct-q4_K_M
+    llama-3-70b: llama-3-70b-instruct-q4_K_M
+
+sessions:
+  file: sessions.json

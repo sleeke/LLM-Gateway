@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM Gateway UI</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>LLM Gateway</h1>
+      <nav>
+        <button class="nav-btn active" data-view="sessions">Sessions</button>
+        <button class="nav-btn" data-view="health">Health</button>
+      </nav>
+    </header>
+
+    <main>
+      <section id="sessions-view" class="view">
+        <div class="view-header">
+          <h2>Session Management</h2>
+          <button id="refresh-sessions" class="btn btn-secondary">Refresh</button>
+        </div>
+        <div class="banner">
+          Configure your LLM provider at <strong>http://127.0.0.1:3000</strong>
+        </div>
+        <table class="sessions-table">
+          <thead>
+            <tr>
+              <th>Client ID</th>
+              <th>API Key</th>
+              <th>Provider</th>
+              <th>Last Updated</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="sessions-tbody">
+            <tr><td colspan="5">Loading...</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="health-view" class="view hidden">
+        <div class="view-header">
+          <h2>Health Status</h2>
+          <button id="refresh-health" class="btn btn-secondary">Refresh</button>
+        </div>
+        <div id="health-status" class="health-grid">
+          <p>Loading...</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
