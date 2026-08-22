@@ -32,7 +32,7 @@ providers:
   openrouter:
     type: openai
     apiKey: ${OPEN_ROUTER_API_KEY}
-    baseURL: https://openrouter.ai/api/v1
+    baseURL: https://openrouter.ai/api
 
 modelAliases:
   anthropic:
@@ -44,6 +44,9 @@ modelAliases:
   lmstudio:
     llama-3-8b: llama-3-8b-instruct-q4_K_M
     llama-3-70b: llama-3-70b-instruct-q4_K_M
+  openrouter:
+    free: openrouter/free
+
 
 sessions:
   file: sessions.json

@@ -22,8 +22,15 @@ export class ProviderProxy {
     const providerConfig = this.config.providers[providerName];
     const providerType = this.translator.getProviderType(providerName);
 
-    const providerUrl = new URL(req.path, providerConfig.baseURL);
-    providerUrl.search = req.url.split('?')[1] || '';
+    let requestPath = req.path;
+    if (providerType === 'openai' && requestPath === '/v1/messages') {
+      requestPath = '/v1/chat/completions';
+    } else if (providerType === 'anthropic' && requestPath === '/v1/chat/completions') {
+      requestPath = '/v1/messages';
+    }
+
+    const queryString = req.url.split('?')[1] || '';
+    const providerUrl = providerConfig.baseURL.replace(/\/$/, '') + requestPath + (queryString ? `?${queryString}` : '');
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -43,12 +50,14 @@ export class ProviderProxy {
     logger.info('Forwarding request to provider', {
       clientId: req.session.clientId,
       provider: providerName,
-      path: req.path,
+      path: requestPath,
       method: req.method,
+      model: req.body.model,
+      url: providerUrl.toString()
     });
 
     try {
-      const response = await fetch(providerUrl.toString(), {
+      const response = await fetch(providerUrl, {
         method: req.method,
         headers,
         body: ['GET', 'HEAD'].includes(req.method) ? undefined : JSON.stringify(req.body),
@@ -122,10 +131,10 @@ export class ProviderProxy {
       let translatedBody = responseBody;
       try {
         const parsed = JSON.parse(responseBody);
-        if (providerType === 'openai' && req.path === '/v1/chat/completions') {
+        if (providerType === 'openai' && requestPath === '/v1/chat/completions') {
           const anthropicResponse = this.translator.openaiToAnthropicResponse(parsed);
           translatedBody = JSON.stringify(anthropicResponse);
-        } else if (providerType === 'anthropic' && req.path === '/v1/messages') {
+        } else if (providerType === 'anthropic' && requestPath === '/v1/messages') {
           const openaiResponse = this.translator.anthropicToOpenAIResponse(parsed);
           translatedBody = JSON.stringify(openaiResponse);
         }
