@@ -4,6 +4,8 @@ import {
   AnthropicResponse,
   AnthropicContentBlock,
   AnthropicStreamEvent,
+  AnthropicToolUseBlock,
+  AnthropicToolResultBlock,
   OpenAIRequest,
   OpenAIResponse,
   OpenAIMessage,
@@ -43,6 +45,17 @@ export class FormatTranslator {
     if (body.top_p !== undefined) result.top_p = body.top_p;
     if (body.stop_sequences && body.stop_sequences.length > 0) result.stop = body.stop_sequences;
 
+    if (body.tools && body.tools.length > 0) {
+      result.tools = body.tools.map((tool) => ({
+        type: 'function' as const,
+        function: {
+          name: tool.name,
+          ...(tool.description !== undefined ? { description: tool.description } : {}),
+          parameters: tool.input_schema,
+        },
+      }));
+    }
+
     const messages: OpenAIMessage[] = [];
     const systemMessage = typeof body.system === 'string' ? body.system : this.flattenContent(body.system || []);
 
@@ -50,10 +63,64 @@ export class FormatTranslator {
       if (msg.role === 'system' && systemMessage) {
         continue;
       }
-      messages.push({
-        role: msg.role as 'user' | 'assistant',
-        content: typeof msg.content === 'string' ? msg.content : this.flattenContent(msg.content),
-      });
+
+      if (typeof msg.content === 'string') {
+        messages.push({ role: msg.role as 'user' | 'assistant', content: msg.content });
+        continue;
+      }
+
+      const blocks = msg.content || [];
+
+      if (msg.role === 'assistant') {
+        const toolUseBlocks = blocks.filter((b): b is AnthropicToolUseBlock => b.type === 'tool_use');
+        const textContent = blocks
+          .filter((b): b is AnthropicContentBlock => b.type === 'text')
+          .map((b) => b.text)
+          .join('');
+
+        if (toolUseBlocks.length > 0) {
+          messages.push({
+            role: 'assistant',
+            content: textContent || null,
+            tool_calls: toolUseBlocks.map((b) => ({
+              id: b.id,
+              type: 'function' as const,
+              function: {
+                name: b.name,
+                arguments: JSON.stringify(b.input),
+              },
+            })),
+          });
+        } else {
+          messages.push({ role: 'assistant', content: textContent });
+        }
+      } else if (msg.role === 'user') {
+        const toolResultBlocks = blocks.filter((b): b is AnthropicToolResultBlock => b.type === 'tool_result');
+        const textContent = blocks
+          .filter((b): b is AnthropicContentBlock => b.type === 'text')
+          .map((b) => b.text)
+          .join('');
+
+        if (toolResultBlocks.length > 0) {
+          if (textContent) {
+            messages.push({ role: 'user', content: textContent });
+          }
+          for (const tr of toolResultBlocks) {
+            messages.push({
+              role: 'tool',
+              content: typeof tr.content === 'string' ? tr.content : this.flattenContent(tr.content),
+              tool_call_id: tr.tool_use_id,
+            });
+          }
+        } else {
+          messages.push({ role: 'user', content: textContent });
+        }
+      } else {
+        messages.push({
+          role: msg.role as 'user' | 'assistant',
+          content: this.flattenContent(blocks.filter((b): b is AnthropicContentBlock => b.type === 'text')),
+        });
+      }
     }
 
     if (systemMessage) {
@@ -86,12 +153,12 @@ export class FormatTranslator {
 
     for (const msg of body.messages) {
       if (msg.role === 'system') {
-        systemContent = msg.content;
+        systemContent = msg.content || undefined;
         continue;
       }
       messages.push({
         role: msg.role as 'user' | 'assistant',
-        content: msg.content,
+        content: msg.content || '',
       });
     }
 
@@ -107,11 +174,22 @@ export class FormatTranslator {
 
   openaiToAnthropicResponse(body: OpenAIResponse): AnthropicResponse {
     const choice = body.choices[0];
+    const content: (AnthropicContentBlock | AnthropicToolUseBlock)[] = (choice.message.tool_calls || []).map((tc) => ({
+      type: 'tool_use' as const,
+      id: tc.id,
+      name: tc.function.name,
+      input: this.parseToolArguments(tc.function.arguments),
+    }));
+
+    if (content.length === 0 && choice.message.content) {
+      content.push({ type: 'text', text: choice.message.content });
+    }
+
     return {
       id: `msg_${Date.now()}`,
       type: 'message',
       role: 'assistant',
-      content: [{ type: 'text', text: choice.message.content }],
+      content,
       model: body.model,
       stop_reason: this.mapFinishReason(choice.finish_reason),
       usage: {
@@ -121,8 +199,17 @@ export class FormatTranslator {
     };
   }
 
+  private parseToolArguments(argumentsStr: string): Record<string, unknown> {
+    try {
+      return JSON.parse(argumentsStr);
+    } catch {
+      return { raw: argumentsStr };
+    }
+  }
+
   anthropicToOpenAIResponse(body: AnthropicResponse): OpenAIResponse {
-    const content = body.content.find((c: { type: string; text?: string }) => c.type === 'text')?.text || '';
+    const textBlock = body.content.find((c): c is AnthropicContentBlock => c.type === 'text');
+    const content = textBlock?.text || '';
     return {
       id: body.id,
       choices: [
@@ -166,7 +253,27 @@ export class FormatTranslator {
       });
     }
 
-    if (choice.delta.content) {
+    if (choice.delta.tool_calls) {
+      for (const tc of choice.delta.tool_calls) {
+        if (tc.id && tc.type === 'function') {
+          events.push({
+            type: 'content_block_start',
+            index: 0,
+            message: undefined,
+          });
+          events.push({
+            type: 'content_block_delta',
+            index: 0,
+            delta: {
+              type: 'tool_use_delta',
+              ...(tc.id ? { id: tc.id } : {}),
+              ...(tc.function?.name ? { name: tc.function.name } : {}),
+              ...(tc.function?.arguments ? { arguments: tc.function.arguments } : {}),
+            },
+          });
+        }
+      }
+    } else if (choice.delta.content) {
       events.push({
         type: 'content_block_delta',
         index: 0,

@@ -45,7 +45,7 @@ modelAliases:
     llama-3-8b: llama-3-8b-instruct-q4_K_M
     llama-3-70b: llama-3-70b-instruct-q4_K_M
   openrouter:
-    free: openrouter/free
+    free: nvidia/nemotron-3.5-lightning:free
 
 
 sessions:
