@@ -44,25 +44,24 @@ export class FormatTranslator {
     if (body.stop_sequences && body.stop_sequences.length > 0) result.stop = body.stop_sequences;
 
     const messages: OpenAIMessage[] = [];
-    const systemMessage = body.system;
+    const systemMessage = typeof body.system === 'string' ? body.system : this.flattenContent(body.system || []);
 
     for (const msg of body.messages) {
-      if (msg.role === 'system') {
-        if (systemMessage) {
-          result.messages = [
-            { role: 'system', content: systemMessage },
-            ...messages,
-            { role: 'user', content: typeof msg.content === 'string' ? msg.content : this.flattenContent(msg.content) },
-          ];
-        } else {
-          messages.push({ role: 'user', content: typeof msg.content === 'string' ? msg.content : this.flattenContent(msg.content) });
-        }
+      if (msg.role === 'system' && systemMessage) {
         continue;
       }
-      messages.push({ role: msg.role, content: typeof msg.content === 'string' ? msg.content : this.flattenContent(msg.content) });
+      messages.push({
+        role: msg.role as 'user' | 'assistant',
+        content: typeof msg.content === 'string' ? msg.content : this.flattenContent(msg.content),
+      });
     }
 
-    if (!systemMessage) {
+    if (systemMessage) {
+      result.messages = [
+        { role: 'system', content: systemMessage },
+        ...messages,
+      ];
+    } else {
       result.messages = messages;
     }
 

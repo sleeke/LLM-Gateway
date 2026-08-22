@@ -17,6 +17,7 @@ export function createLLMApiRouter(providerProxy: ProviderProxy): Router {
       const translator = providerProxy['translator'];
       const providerName = req.provider!.name;
       req.body = translator.anthropicToOpenAIRequest(req.body as any, providerName);
+      logger.debug('Translated request body', { body: req.body });
     }
 
     await providerProxy.forwardRequest(req, res);

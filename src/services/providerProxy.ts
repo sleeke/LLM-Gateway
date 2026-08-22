@@ -53,7 +53,7 @@ export class ProviderProxy {
       path: requestPath,
       method: req.method,
       model: req.body.model,
-      url: providerUrl.toString()
+      url: providerUrl
     });
 
     try {
@@ -97,7 +97,10 @@ export class ProviderProxy {
                   }
                   try {
                     const parsed = JSON.parse(dataStr);
-                    res.write(encoder.encode(`data: ${JSON.stringify(parsed)}\n\n`));
+                    const translatedEvents = this.translator.translateOpenAIStreamChunkToAnthropic(parsed, providerName);
+                    for (const event of translatedEvents) {
+                      res.write(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+                    }
                   } catch {
                     res.write(encoder.encode(line + '\n'));
                   }
