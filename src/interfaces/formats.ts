@@ -153,7 +153,6 @@ export interface OpenAIStreamChunk {
 }
 
 export interface Session {
-  provider: string | null;
   updatedAt: string;
   clientId: string;
 }

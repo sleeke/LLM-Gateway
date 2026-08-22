@@ -8,10 +8,8 @@ server:
 clients:
   - id: claude-cli
     apiKey: ${CLIENT_KEY_CLAUDE}
-    provider: openrouter
   - id: kilo
     apiKey: ${CLIENT_KEY_KILO}
-    provider: openai
 
 providers:
   anthropic:
@@ -34,18 +32,25 @@ providers:
     apiKey: ${OPEN_ROUTER_API_KEY}
     baseURL: https://openrouter.ai/api
 
-modelAliases:
-  anthropic:
-    claude-3-5-sonnet-latest: claude-3-5-sonnet-20241022
-    claude-3-5-haiku-latest: claude-3-5-haiku-20241022
-  openai:
-    gpt-4: gpt-4
-    gpt-4o: gpt-4o
-  lmstudio:
-    llama-3-8b: llama-3-8b-instruct-q4_K_M
-    llama-3-70b: llama-3-70b-instruct-q4_K_M
-  openrouter:
-    free: nvidia/nemotron-3.5-lightning:free
+modelRouting:
+  - name: free-high
+    provider: openrouter
+    model: nvidia/nemotron-3-ultra-550b-a55b:free
+  - name: free-medium
+    provider: openrouter
+    model: stealth/ox-alpha
+  - name: free-low
+    provider: openrouter
+    model: nvidia/nemotron-3.5-lightning:free
+  - name: claude-3-5-sonnet-latest
+    provider: anthropic
+    model: claude-3-5-sonnet-20241022
+  - name: claude-3-5-haiku-latest
+    provider: anthropic
+    model: claude-3-5-haiku-20241022
+  - name: gpt-4o
+    provider: openai
+    model: gpt-4o
 
 
 sessions:

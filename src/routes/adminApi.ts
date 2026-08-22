@@ -32,64 +32,9 @@ export function createAdminApiRouter(sessionManager: SessionManager, adminApiKey
       sessions: sessions.map((s) => ({
         clientId: s.clientId,
         apiKey: s.apiKey.substring(0, 8) + '...',
-        provider: s.provider,
         updatedAt: s.updatedAt,
       })),
     });
-  });
-
-  router.post('/sessions/assign-provider', (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const { apiKey, provider } = req.body;
-
-      if (!apiKey || !provider) {
-        res.status(400).json({
-          error: {
-            message: 'Missing required fields: apiKey, provider',
-            type: 'invalid_request_error',
-          },
-        });
-        return;
-      }
-
-      sessionManager.setProviderForApiKey(apiKey, provider);
-      res.json({ success: true, apiKey, provider });
-    } catch (error) {
-      logger.error('Failed to assign provider', { error: (error as Error).message });
-      res.status(400).json({
-        error: {
-          message: (error as Error).message,
-          type: 'invalid_request_error',
-        },
-      });
-    }
-  });
-
-  router.post('/sessions/remove-provider', (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const { apiKey } = req.body;
-
-      if (!apiKey) {
-        res.status(400).json({
-          error: {
-            message: 'Missing required field: apiKey',
-            type: 'invalid_request_error',
-          },
-        });
-        return;
-      }
-
-      sessionManager.removeProviderForApiKey(apiKey);
-      res.json({ success: true, apiKey });
-    } catch (error) {
-      logger.error('Failed to remove provider', { error: (error as Error).message });
-      res.status(400).json({
-        error: {
-          message: (error as Error).message,
-          type: 'invalid_request_error',
-        },
-      });
-    }
   });
 
   router.get('/providers', (req: AuthenticatedRequest, res: Response) => {

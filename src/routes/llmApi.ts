@@ -1,67 +1,60 @@
 import { Router, Response } from 'express';
 import { AuthenticatedRequest } from '../middleware/apiKeyAuth';
 import { ProviderProxy } from '../services/providerProxy';
+import { Config } from '../interfaces/config';
 import { logger } from '../utils/logger';
 
-export function createLLMApiRouter(providerProxy: ProviderProxy): Router {
+export function createLLMApiRouter(providerProxy: ProviderProxy, config: Config): Router {
   const router = Router();
 
-  router.post('/v1/messages', async (req: AuthenticatedRequest, res: Response) => {
-    const providerType = req.provider?.name ? providerProxy['translator'].getProviderType(req.provider.name) : 'openai';
-    const isAnthropicFormat = providerType === 'anthropic';
+  function resolveModel(req: AuthenticatedRequest, res: Response): boolean {
+    const modelName = req.body?.model as string | undefined;
+    if (!modelName) {
+      res.status(400).json({ error: { message: 'Missing required field: model', type: 'invalid_request_error' } });
+      return false;
+    }
+    const entry = config.modelRouting[modelName];
+    if (!entry) {
+      res.status(400).json({ error: { message: `Unknown model: ${modelName}`, type: 'invalid_request_error' } });
+      return false;
+    }
+    req.provider = { name: entry.provider };
+    req.body.model = entry.model;
+    return true;
+  }
 
-    if (isAnthropicFormat) {
-      logger.debug('Passing through Anthropic format request');
-      req.body = req.body;
-    } else {
-      const translator = providerProxy['translator'];
-      const providerName = req.provider!.name;
-      req.body = translator.anthropicToOpenAIRequest(req.body as any, providerName);
-      logger.debug('Translated request body', { body: req.body });
+  router.post('/v1/messages', async (req: AuthenticatedRequest, res: Response) => {
+    if (!resolveModel(req, res)) return;
+
+    const providerType = providerProxy['translator'].getProviderType(req.provider!.name);
+    if (providerType === 'openai') {
+      req.body = providerProxy['translator'].anthropicToOpenAIRequest(req.body as any, req.provider!.name);
+      logger.debug('Translated Anthropic → OpenAI for /v1/messages');
     }
 
     await providerProxy.forwardRequest(req, res);
   });
 
   router.post('/v1/chat/completions', async (req: AuthenticatedRequest, res: Response) => {
-    const providerType = req.provider?.name ? providerProxy['translator'].getProviderType(req.provider.name) : 'openai';
-    const isOpenAIFormat = providerType === 'openai';
+    if (!resolveModel(req, res)) return;
 
-    if (isOpenAIFormat) {
-      logger.debug('Passing through OpenAI format request');
-      req.body = req.body;
-    } else {
-      const translator = providerProxy['translator'];
-      const providerName = req.provider!.name;
-      req.body = translator.openaiToAnthropicRequest(req.body as any, providerName);
+    const providerType = providerProxy['translator'].getProviderType(req.provider!.name);
+    if (providerType === 'anthropic') {
+      req.body = providerProxy['translator'].openaiToAnthropicRequest(req.body as any, req.provider!.name);
+      logger.debug('Translated OpenAI → Anthropic for /v1/chat/completions');
     }
 
     await providerProxy.forwardRequest(req, res);
   });
 
-  router.get('/v1/models', async (req: AuthenticatedRequest, res: Response) => {
-    try {
-      if (!req.provider) {
-        res.status(403).json({ error: { message: 'No provider selected', type: 'session_error' } });
-        return;
-      }
-
-      const providerConfig = providerProxy['config'].providers[req.provider.name];
-      const providerUrl = `${providerConfig.baseURL}/models`;
-      const headers: Record<string, string> = {};
-      if (providerConfig.apiKey) {
-        headers['Authorization'] = `Bearer ${providerConfig.apiKey}`;
-      }
-
-      const response = await fetch(providerUrl, { headers });
-      const responseBody = await response.text();
-      res.status(response.status);
-      res.setHeader('Content-Type', response.headers.get('content-type') || 'application/json');
-      res.send(responseBody);
-    } catch (error) {
-      logger.error('Models request failed', { error: (error as Error).message });
-      res.status(502).json({ error: { message: 'Provider request failed', type: 'provider_error' } });
-    }
+  router.get('/v1/models', (req: AuthenticatedRequest, res: Response) => {
+    const models = Object.entries(config.modelRouting).map(([name, entry]) => ({
+      id: name,
+      object: 'model',
+      created: 0,
+      owned_by: entry.provider,
+    }));
+    res.json({ object: 'list', data: models });
   });
 
   router.use('*', (req: AuthenticatedRequest, res: Response) => {

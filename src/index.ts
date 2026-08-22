@@ -26,14 +26,14 @@ async function main() {
     const providerProxy = new ProviderProxy(config, sessionManager, translator);
 
     const apiKeyAuth = createApiKeyAuthMiddleware(config);
-    const sessionGuard = createSessionGuardMiddleware(sessionManager, config.server.uiPort);
+    const sessionGuard = createSessionGuardMiddleware();
     const corsMiddleware = createCorsMiddleware(`http://127.0.0.1:${config.server.uiPort}`);
 
     const llmApp = express();
     llmApp.use(express.json({ limit: '50mb' }));
     llmApp.use(apiKeyAuth);
     llmApp.use(sessionGuard);
-    llmApp.use('/', createLLMApiRouter(providerProxy));
+    llmApp.use('/', createLLMApiRouter(providerProxy, config));
 
     const adminApp = express();
     adminApp.use(express.json({ limit: '50mb' }));

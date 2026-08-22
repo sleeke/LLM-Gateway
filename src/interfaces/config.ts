@@ -7,14 +7,14 @@ export interface ProviderConfig {
 export interface ClientConfig {
   id: string;
   apiKey: string;
-  provider?: string;
 }
 
-export interface ModelAliasMap {
-  [provider: string]: {
-    [alias: string]: string;
-  };
+export interface ModelRoutingEntry {
+  provider: string;
+  model: string;
 }
+
+export type ModelRoutingMap = Record<string, ModelRoutingEntry>;
 
 export interface ServerConfig {
   host: string;
@@ -32,6 +32,6 @@ export interface Config {
   server: ServerConfig;
   clients: ClientConfig[];
   providers: Record<string, ProviderConfig>;
-  modelAliases: ModelAliasMap;
+  modelRouting: ModelRoutingMap;
   sessions: SessionsConfig;
 }

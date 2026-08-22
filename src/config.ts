@@ -21,7 +21,7 @@ export function loadConfig(configPath: string): Config {
   const server = rawConfig.server as Record<string, unknown>;
   const clients = rawConfig.clients as Record<string, unknown>[];
   const providers = rawConfig.providers as Record<string, Record<string, unknown>>;
-  const modelAliases = rawConfig.modelAliases as Record<string, Record<string, string>>;
+  const rawModelRouting = (rawConfig.modelRouting ?? []) as Array<{ name: string; provider: string; model: string }>;
   const sessions = rawConfig.sessions as Record<string, unknown>;
 
   if (!server) {
@@ -45,7 +45,6 @@ export function loadConfig(configPath: string): Config {
     clients: clients.map((client, index) => ({
       id: client.id as string,
       apiKey: resolveEnv(client.apiKey as string, `missing-client-key-${index}`),
-      provider: client.provider as string | undefined,
     })),
     providers: Object.entries(providers).reduce((acc, [name, provider]) => {
       acc[name] = {
@@ -55,7 +54,9 @@ export function loadConfig(configPath: string): Config {
       };
       return acc;
     }, {} as Record<string, { type: 'anthropic' | 'openai'; apiKey: string; baseURL: string }>),
-    modelAliases: modelAliases || {},
+    modelRouting: Object.fromEntries(
+      rawModelRouting.map(({ name, provider, model }) => [name, { provider, model }])
+    ),
     sessions: {
       file: (sessions?.file as string) || 'sessions.json',
     },
@@ -65,6 +66,12 @@ export function loadConfig(configPath: string): Config {
     const p = provider as { baseURL: string };
     if (!p.baseURL) {
       throw new Error(`Provider '${name}' is missing baseURL`);
+    }
+  }
+
+  for (const [name, entry] of Object.entries(resolvedConfig.modelRouting)) {
+    if (!resolvedConfig.providers[entry.provider]) {
+      throw new Error(`modelRouting rule '${name}' references unknown provider '${entry.provider}'`);
     }
   }
 

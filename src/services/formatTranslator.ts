@@ -25,17 +25,9 @@ export class FormatTranslator {
     return provider.type;
   }
 
-  resolveModelAlias(providerName: string, model: string): string {
-    const providerAliases = this.config.modelAliases[providerName];
-    if (providerAliases && providerAliases[model]) {
-      return providerAliases[model];
-    }
-    return model;
-  }
-
   anthropicToOpenAIRequest(body: AnthropicRequest, providerName: string): OpenAIRequest {
     const result: OpenAIRequest = {
-      model: this.resolveModelAlias(providerName, body.model),
+      model: body.model,
       messages: [],
       max_tokens: body.max_tokens,
       stream: body.stream,
@@ -138,7 +130,7 @@ export class FormatTranslator {
 
   openaiToAnthropicRequest(body: OpenAIRequest, providerName: string): AnthropicRequest {
     const result: AnthropicRequest = {
-      model: this.resolveModelAlias(providerName, body.model),
+      model: body.model,
       messages: [],
       max_tokens: body.max_tokens || 1024,
       stream: body.stream,
@@ -241,7 +233,7 @@ export class FormatTranslator {
           type: 'message',
           role: 'assistant',
           content: [],
-          model: this.resolveModelAlias(providerName, chunk.model || ''),
+          model: chunk.model || '',
           stop_reason: '',
           usage: { input_tokens: 0, output_tokens: 0 },
         },
@@ -300,7 +292,6 @@ export class FormatTranslator {
 
   translateAnthropicStreamEventToOpenAI(event: AnthropicStreamEvent, providerName: string): OpenAIStreamChunk[] {
     const chunks: OpenAIStreamChunk[] = [];
-    const modelAlias = this.resolveModelAlias(providerName, '');
 
     switch (event.type) {
       case 'message_start': {
@@ -330,7 +321,7 @@ export class FormatTranslator {
                 finish_reason: undefined,
               },
             ],
-            model: modelAlias,
+            model: '',
           });
         }
         break;
@@ -346,7 +337,7 @@ export class FormatTranslator {
                 finish_reason: this.mapAnthropicStopReason(event.delta.stop_reason),
               },
             ],
-            model: modelAlias,
+            model: '',
           });
         }
         break;

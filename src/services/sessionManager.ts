@@ -7,7 +7,7 @@ import { logger } from '../utils/logger';
 export class SessionManager {
   private sessions: Map<string, Session> = new Map();
   private sessionsFile: string;
-  private clientMap: Map<string, { id: string; apiKey: string; provider?: string }> = new Map();
+  private clientMap: Map<string, { id: string; apiKey: string }> = new Map();
 
   constructor(private config: Config) {
     this.sessionsFile = path.isAbsolute(config.sessions.file)
@@ -43,7 +43,6 @@ export class SessionManager {
       for (const client of this.config.clients) {
         if (!this.sessions.has(client.apiKey)) {
           this.sessions.set(client.apiKey, {
-            provider: client.provider || null,
             updatedAt: new Date().toISOString(),
             clientId: client.id,
           });
@@ -68,60 +67,25 @@ export class SessionManager {
     }
   }
 
-  getProviderForApiKey(apiKey: string): string | null {
-    const session = this.sessions.get(apiKey);
-    return session ? session.provider : null;
-  }
-
-  setProviderForApiKey(apiKey: string, provider: string): void {
-    if (!this.clientMap.has(apiKey)) {
-      throw new Error('Unknown API key');
-    }
-    this.sessions.set(apiKey, {
-      provider,
-      updatedAt: new Date().toISOString(),
-      clientId: this.clientMap.get(apiKey)!.id,
-    });
-    this.persistSessions();
-    logger.info('Provider assigned', { clientId: this.clientMap.get(apiKey)!.id, provider });
-  }
-
-  removeProviderForApiKey(apiKey: string): void {
-    if (!this.clientMap.has(apiKey)) {
-      throw new Error('Unknown API key');
-    }
-    this.sessions.set(apiKey, {
-      provider: null,
-      updatedAt: new Date().toISOString(),
-      clientId: this.clientMap.get(apiKey)!.id,
-    });
-    this.persistSessions();
-    logger.info('Provider removed', { clientId: this.clientMap.get(apiKey)!.id });
-  }
-
   getAllSessions(): Array<{
     apiKey: string;
     clientId: string;
-    provider: string | null;
     updatedAt: string;
   }> {
     const result: Array<{
       apiKey: string;
       clientId: string;
-      provider: string | null;
       updatedAt: string;
     }> = [];
 
     for (const client of this.config.clients) {
       const session = this.sessions.get(client.apiKey) || {
-        provider: client.provider || null,
         updatedAt: new Date().toISOString(),
         clientId: client.id,
       };
       result.push({
         apiKey: client.apiKey,
         clientId: client.id,
-        provider: session.provider,
         updatedAt: session.updatedAt,
       });
     }
