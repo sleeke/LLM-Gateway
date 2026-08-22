@@ -142,6 +142,14 @@ This means the Admin API request did not include the correct admin Bearer token.
 - If you have not set `ADMIN_API_KEY` in your `.env`, either set it or remove `adminApiKey` from `config/config.yaml` to disable admin auth.
 - Admin endpoints like `/sessions` require this header; `/health` does not.
 
+### Error: Failed to fetch
+
+This generic error usually means a client or the UI could not reach a backend endpoint.
+
+- **For Claude Code CLI or other LLM clients**: Check that the gateway is running and the `BASE_URL` points to the gateway (e.g., `http://127.0.0.1:8080`). Verify the client API key is correct and the client's provider assignment is set.
+- **For the Admin UI**: Ensure the gateway is running and ports `3000`/`3001` are not blocked. If `adminApiKey` is configured, enter it in the UI when prompted.
+- **For the gateway itself**: If `/v1/models` or upstream provider calls fail, verify the provider `baseURL` and `apiKey` in `config/config.yaml` are correct and reachable from the machine running the gateway.
+
 ## Format Translation
 
 The gateway automatically translates between Anthropic and OpenAI request/response formats based on the client's assigned provider, so clients can use their native format regardless of the upstream provider.
