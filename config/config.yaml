@@ -25,23 +25,31 @@ providers:
   lmstudio:
     type: openai
     apiKey: ""
-    baseURL: http://localhost:1234/v1
+    baseURL: http://localhost:1234
 
   openrouter:
     type: openai
     apiKey: ${OPEN_ROUTER_API_KEY}
     baseURL: https://openrouter.ai/api
 
+  copilot:
+    type: anthropic
+    apiKey: ""
+    baseURL: http://localhost:4141/
+
 modelRouting:
+  - name: free-random
+    provider: openrouter
+    model: openrouter/free
   - name: free-high
     provider: openrouter
-    model: nvidia/nemotron-3-ultra-550b-a55b:free
+    model: stealth/ox-alpha
   - name: free-medium
     provider: openrouter
-    model: stealth/ox-alpha
+    model: nvidia/nemotron-3.5-lightning:free
   - name: free-low
     provider: openrouter
-    model: nvidia/nemotron-3.5-lightning:free
+    model: poolside/laguna-s-2.1:free
   - name: claude-3-5-sonnet-latest
     provider: anthropic
     model: claude-3-5-sonnet-20241022
@@ -51,6 +59,17 @@ modelRouting:
   - name: gpt-4o
     provider: openai
     model: gpt-4o
+  - name: copilot
+    provider: copilot
+    model: claude-sonnet-4.6
+  - name: local
+    provider: lmstudio
+    model: available
+  - name: claude-haiku-4-5-20251001
+    provider: openrouter
+    model: poolside/laguna-s-2.1:free
+
+    
 
 
 sessions:

@@ -151,12 +151,14 @@ export class ProviderProxy {
         provider: providerName,
         error: (error as Error).message,
       });
-      res.status(502).json({
-        error: {
-          message: 'Provider request failed',
-          type: 'provider_error',
-        },
-      });
+      if (!res.headersSent) {
+        res.status(502).json({
+          error: {
+            message: 'Provider request failed',
+            type: 'provider_error',
+          },
+        });
+      }
     }
   }
 }
