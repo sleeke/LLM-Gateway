@@ -24,7 +24,7 @@ providers:
 
   lmstudio:
     type: openai
-    apiKey: ""
+    apiKey: "UNNECESSARY"
     baseURL: http://localhost:1234
 
   openrouter:
@@ -32,12 +32,18 @@ providers:
     apiKey: ${OPEN_ROUTER_API_KEY}
     baseURL: https://openrouter.ai/api
 
-  copilot:
+  copilot:  # See https://github.com/shyamsridhar123/ClaudeCode-Copilot-Proxy
     type: anthropic
-    apiKey: ""
-    baseURL: http://localhost:4141/
+    apiKey: "sk-dummy"
+    baseURL: http://localhost:3000/
+
+  kilo:
+    type: openai
+    apiKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbnYiOiJwcm9kdWN0aW9uIiwia2lsb1VzZXJJZCI6IjczOWMxMWE2LTQ0OGMtNDBlYy1hYWYyLTVjNWQ5NDFhNWNhOSIsImFwaVRva2VuUGVwcGVyIjpudWxsLCJ2ZXJzaW9uIjozLCJpYXQiOjE3ODc1MTc5NzMsImV4cCI6MTk0NTE5Nzk3M30.Fd8J7AQcky1c05W-ibUBjkeB3oTuadpy3Ezja6oAZvc"
+    baseURL: https://api.kilo.ai/api/gateway
 
 modelRouting:
+# OpenRouter
   - name: free-random
     provider: openrouter
     model: openrouter/free
@@ -47,9 +53,8 @@ modelRouting:
   - name: free-medium
     provider: openrouter
     model: nvidia/nemotron-3.5-lightning:free
-  - name: free-low
-    provider: openrouter
-    model: poolside/laguna-s-2.1:free
+
+# Claude
   - name: claude-3-5-sonnet-latest
     provider: anthropic
     model: claude-3-5-sonnet-20241022
@@ -59,15 +64,35 @@ modelRouting:
   - name: gpt-4o
     provider: openai
     model: gpt-4o
+
+# Copilot
   - name: copilot
     provider: copilot
-    model: claude-sonnet-4.6
+    model: auto
+
+#  Local
   - name: local
     provider: lmstudio
     model: available
-  - name: claude-haiku-4-5-20251001
+
+# Claude-requested
+  - name: claude-haiku-*
     provider: openrouter
     model: poolside/laguna-s-2.1:free
+
+# Kilo
+  - name: kilo-auto
+    provider: kilo
+    model: kilo-auto/free
+  - name: kilo-frontier # Paid only
+    provider: kilo
+    model: kilo-auto/frontier
+  - name: kilo-balanced
+    provider: kilo
+    model: kilo-auto/balanced
+  - name: kilo-efficient
+    provider: kilo
+    model: kilo-auto/efficient
 
     
 
