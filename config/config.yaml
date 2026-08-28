@@ -39,8 +39,13 @@ providers:
 
   kilo:
     type: openai
-    apiKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbnYiOiJwcm9kdWN0aW9uIiwia2lsb1VzZXJJZCI6IjczOWMxMWE2LTQ0OGMtNDBlYy1hYWYyLTVjNWQ5NDFhNWNhOSIsImFwaVRva2VuUGVwcGVyIjpudWxsLCJ2ZXJzaW9uIjozLCJpYXQiOjE3ODc1MTc5NzMsImV4cCI6MTk0NTE5Nzk3M30.Fd8J7AQcky1c05W-ibUBjkeB3oTuadpy3Ezja6oAZvc"
+    apiKey: ${KILO_API_KEY}
     baseURL: https://api.kilo.ai/api/gateway
+
+  brad:
+    type: anthropic
+    apiKey: ${BRAD_API_KEY}
+    baseURL: https://racecar.diskstation.me:1234
 
 modelRouting:
 # OpenRouter
@@ -94,8 +99,14 @@ modelRouting:
     provider: kilo
     model: kilo-auto/efficient
 
-    
+# Brad
+  - name: brad-high
+    provider: brad
+    model: "qwen3.8-27b:mtp-q4_k_m-175k"
 
+  - name: brad-low
+    provider: brad
+    model: "qwen3.5-9b:q4_k_m"
 
 sessions:
   file: sessions.json
