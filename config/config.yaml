@@ -1,8 +1,8 @@
 server:
   host: 127.0.0.1
-  llmPort: 8080
-  adminPort: 3001
-  uiPort: 3000
+  llmPort: ${LLM_PORT:-12000}
+  adminPort: ${ADMIN_PORT:-12001}
+  uiPort: ${UI_PORT:-13000}
   adminApiKey: ${ADMIN_API_KEY}
 
 clients:

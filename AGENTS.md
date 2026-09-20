@@ -51,10 +51,10 @@ npm start
 Test with curl:
 ```bash
 # Health check
-curl http://127.0.0.1:3001/health
+curl http://127.0.0.1:12001/health
 
 # List sessions (requires admin API key)
-curl -H "Authorization: Bearer $ADMIN_API_KEY" http://127.0.0.1:3001/sessions
+curl -H "Authorization: Bearer $ADMIN_API_KEY" http://127.0.0.1:12001/sessions
 ```
 
 ## Security

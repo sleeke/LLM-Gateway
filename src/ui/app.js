@@ -1,4 +1,4 @@
-const API_BASE = 'http://127.0.0.1:3001';
+const API_BASE = 'http://127.0.0.1:12001';
 const ADMIN_API_KEY = localStorage.getItem('adminApiKey') || '';
 
 document.addEventListener('DOMContentLoaded', () => {
