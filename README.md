@@ -73,9 +73,9 @@ npm start
 
 ## Access
 
-- LLM API: `http://127.0.0.1:8080`
-- Admin API: `http://127.0.0.1:3001`
-- UI: `http://127.0.0.1:3000`
+- LLM API: `http://127.0.0.1:12000`
+- Admin API: `http://127.0.0.1:12001`
+- UI: `http://127.0.0.1:13000`
 
 ## Usage
 
@@ -110,7 +110,7 @@ Admin endpoints are protected by `Authorization: Bearer $ADMIN_API_KEY` when `ad
 Configure Claude Code CLI to use the gateway as its API endpoint:
 
 ```bash
-export ANTHROPIC_BASE_URL=http://127.0.0.1:8080
+export ANTHROPIC_BASE_URL=http://127.0.0.1:12000
 export ANTHROPIC_API_KEY=<CLIENT_KEY_CLAUDE from config.yaml>
 ```
 
@@ -123,7 +123,7 @@ Use `/model` in Claude Code to select a model. If you have configured model alia
 For OpenAI-compatible clients, point them at the gateway with the appropriate client API key:
 
 ```bash
-export OPENAI_BASE_URL=http://127.0.0.1:8080
+export OPENAI_BASE_URL=http://127.0.0.1:12000
 export OPENAI_API_KEY=<CLIENT_KEY_KILO or other configured client key>
 ```
 
@@ -166,7 +166,7 @@ clients:
 ```
 
 **2. Dynamically at runtime**
-Use the Admin API or the UI at `http://127.0.0.1:3000`:
+Use the Admin API or the UI at `http://127.0.0.1:13000`:
 - **Admin API**: `POST /sessions/assign-provider` with body `{ "apiKey": "<CLIENT_KEY_CLAUDE>", "provider": "openrouter" }`
 - **UI**: Select a provider from the dropdown next to the session and click **Save**
 
@@ -200,7 +200,7 @@ This means the Admin API request did not include the correct admin Bearer token.
 
 This generic error usually means a client or the UI could not reach a backend endpoint.
 
-- **For Claude Code CLI or other LLM clients**: Check that the gateway is running and the `BASE_URL` points to the gateway (e.g., `http://127.0.0.1:8080`). Verify the client API key is correct and the client's provider assignment is set.
+- **For Claude Code CLI or other LLM clients**: Check that the gateway is running and the `BASE_URL` points to the gateway (e.g., `http://127.0.0.1:12000`). Verify the client API key is correct and the client's provider assignment is set.
 - **For the Admin UI**: Ensure the gateway is running and ports `3000`/`3001` are not blocked. If `adminApiKey` is configured, enter it in the UI when prompted.
 - **For the gateway itself**: If `/v1/models` or upstream provider calls fail, verify the provider `baseURL` and `apiKey` in `config/config.yaml` are correct and reachable from the machine running the gateway.
 
