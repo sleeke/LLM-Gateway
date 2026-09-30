@@ -57,13 +57,34 @@ export interface AnthropicResponse {
 
 export interface AnthropicStreamEvent {
   type: string;
-  message?: AnthropicResponse;
+  message?: Partial<AnthropicResponse> | AnthropicResponse;
   index?: number;
+  content_block?: {
+    type: string;
+    text?: string;
+    id?: string;
+    name?: string;
+    input?: Record<string, unknown>;
+  };
   delta?: {
     type: string;
     text?: string;
     stop_reason?: string;
+    stop_sequence?: string | null;
+    partial_json?: string;
   };
+  usage?: {
+    output_tokens: number;
+    input_tokens?: number;
+  };
+}
+
+export interface StreamTranslationState {
+  messageStartSent: boolean;
+  contentBlockIndex: number;
+  contentBlockOpen: boolean;
+  currentBlockType: 'text' | 'tool_use' | null;
+  toolCalls: Record<number, { id: string; name: string; anthropicBlockIndex: number }>;
 }
 
 export interface OpenAIMessage {

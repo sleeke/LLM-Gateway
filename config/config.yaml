@@ -32,10 +32,15 @@ providers:
     apiKey: ${OPEN_ROUTER_API_KEY}
     baseURL: https://openrouter.ai/api
 
-  copilot:  # See https://github.com/shyamsridhar123/ClaudeCode-Copilot-Proxy
+  copilot-openai:  # See https://github.com/shyamsridhar123/ClaudeCode-Copilot-Proxy
+    type: openai
+    apiKey: "sk-dummy"
+    baseURL: http://localhost:4141/
+
+  copilot-anthropic:  # See https://github.com/shyamsridhar123/ClaudeCode-Copilot-Proxy
     type: anthropic
     apiKey: "sk-dummy"
-    baseURL: http://localhost:3000/
+    baseURL: http://localhost:4141/
 
   kilo:
     type: openai
@@ -71,9 +76,17 @@ modelRouting:
     model: gpt-4o
 
 # Copilot
-  - name: copilot
-    provider: copilot
-    model: auto
+  - name: copilot-sonnet-5
+    provider: copilot-anthropic
+    model: claude-sonnet-5
+
+  - name: copilot-gemini-flash-3.8
+    provider: copilot-openai
+    model: gemini-3.8-flash
+
+  - name: copilot-gpt-5.4-mini
+    provider: copilot-openai
+    model: gpt-5.4-mini
 
 #  Local
   - name: local

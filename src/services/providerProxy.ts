@@ -21,6 +21,7 @@ export class ProviderProxy {
     const providerName = req.provider.name;
     const providerConfig = this.config.providers[providerName];
     const providerType = this.translator.getProviderType(providerName);
+    const clientFormat: 'anthropic' | 'openai' = req.path.startsWith('/v1/messages') ? 'anthropic' : 'openai';
 
     let requestPath = req.path;
     if (providerType === 'openai' && requestPath === '/v1/messages') {
@@ -41,7 +42,7 @@ export class ProviderProxy {
     }
 
     if (providerType === 'anthropic') {
-      headers['anthropic-version'] = '2023-06-01';
+      headers['anthropic-version'] = (req.headers['anthropic-version'] as string) || '2023-06-01';
       headers['Accept'] = req.headers.accept || 'application/json';
     } else {
       headers['Accept'] = req.headers.accept || 'application/json';
@@ -77,35 +78,57 @@ export class ProviderProxy {
 
         const decoder = new TextDecoder();
         const encoder = new TextEncoder();
+        let buffer = '';
+        const streamState = this.translator.createStreamState();
 
         try {
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
 
-            const chunk = decoder.decode(value, { stream: true });
-            if (providerType === 'anthropic') {
-              res.write(encoder.encode(chunk));
-            } else {
-              const lines = chunk.split('\n');
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            if (clientFormat === providerType) {
+              const forwardChunk = lines.length > 0 ? lines.join('\n') + '\n' : '';
+              if (forwardChunk) {
+                res.write(encoder.encode(forwardChunk));
+              }
+            } else if (clientFormat === 'anthropic' && providerType === 'openai') {
               for (const line of lines) {
-                if (line.trim().startsWith('data: ')) {
-                  const dataStr = line.trim().substring(6);
-                  if (dataStr === '[DONE]') {
+                const trimmed = line.trim();
+                if (!trimmed.startsWith('data: ')) continue;
+                const dataStr = trimmed.substring(6).trim();
+                if (dataStr === '[DONE]') continue;
+
+                try {
+                  const parsed = JSON.parse(dataStr);
+                  const events = this.translator.translateOpenAIStreamChunkToAnthropic(parsed, streamState);
+                  for (const event of events) {
+                    res.write(encoder.encode(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`));
+                  }
+                } catch {
+                  // Ignore partial JSON
+                }
+              }
+            } else if (clientFormat === 'openai' && providerType === 'anthropic') {
+              for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed.startsWith('data: ')) continue;
+                const dataStr = trimmed.substring(6).trim();
+
+                try {
+                  const parsed = JSON.parse(dataStr);
+                  const chunks = this.translator.translateAnthropicStreamEventToOpenAI(parsed, providerName);
+                  for (const chunk of chunks) {
+                    res.write(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+                  }
+                  if (parsed.type === 'message_stop') {
                     res.write(encoder.encode('data: [DONE]\n\n'));
-                    continue;
                   }
-                  try {
-                    const parsed = JSON.parse(dataStr);
-                    const translatedEvents = this.translator.translateOpenAIStreamChunkToAnthropic(parsed, providerName);
-                    for (const event of translatedEvents) {
-                      res.write(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
-                    }
-                  } catch {
-                    res.write(encoder.encode(line + '\n'));
-                  }
-                } else if (line.trim()) {
-                  res.write(encoder.encode(line + '\n'));
+                } catch {
+                  // Ignore partial JSON
                 }
               }
             }
@@ -125,6 +148,7 @@ export class ProviderProxy {
         logger.error('Provider returned error', {
           status: response.status,
           statusText: response.statusText,
+          requestBody: JSON.stringify(req.body),
           body: responseBody,
         });
         res.send(responseBody);
@@ -134,10 +158,10 @@ export class ProviderProxy {
       let translatedBody = responseBody;
       try {
         const parsed = JSON.parse(responseBody);
-        if (providerType === 'openai' && requestPath === '/v1/chat/completions') {
+        if (clientFormat === 'anthropic' && providerType === 'openai') {
           const anthropicResponse = this.translator.openaiToAnthropicResponse(parsed);
           translatedBody = JSON.stringify(anthropicResponse);
-        } else if (providerType === 'anthropic' && requestPath === '/v1/messages') {
+        } else if (clientFormat === 'openai' && providerType === 'anthropic') {
           const openaiResponse = this.translator.anthropicToOpenAIResponse(parsed);
           translatedBody = JSON.stringify(openaiResponse);
         }

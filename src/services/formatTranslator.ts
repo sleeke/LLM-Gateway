@@ -11,6 +11,7 @@ import {
   OpenAIMessage,
   OpenAIStreamChunk,
   AnthropicMessage,
+  StreamTranslationState,
 } from '../interfaces/formats';
 import { logger } from '../utils/logger';
 
@@ -43,7 +44,7 @@ export class FormatTranslator {
         function: {
           name: tool.name,
           ...(tool.description !== undefined ? { description: tool.description } : {}),
-          parameters: tool.input_schema,
+          parameters: this.sanitizeJsonSchemaForOpenAI(tool.input_schema),
         },
       }));
     }
@@ -220,16 +221,98 @@ export class FormatTranslator {
     };
   }
 
-  translateOpenAIStreamChunkToAnthropic(chunk: OpenAIStreamChunk, providerName: string): AnthropicStreamEvent[] {
+  createStreamState(): StreamTranslationState {
+    return {
+      messageStartSent: false,
+      contentBlockIndex: 0,
+      contentBlockOpen: false,
+      currentBlockType: null,
+      toolCalls: {},
+    };
+  }
+
+  sanitizeJsonSchemaForOpenAI(schema: unknown): Record<string, unknown> {
+    if (!schema || typeof schema !== 'object') {
+      return {};
+    }
+    if (Array.isArray(schema)) {
+      return schema.map((item) => this.sanitizeJsonSchemaForOpenAI(item)) as unknown as Record<string, unknown>;
+    }
+
+    const clean: Record<string, any> = { ...schema };
+    delete clean['$schema'];
+
+    if ('prefixItems' in clean) {
+      if (!clean.items || (typeof clean.items === 'object' && Object.keys(clean.items).length === 0)) {
+        clean.items = {};
+      }
+      delete clean.prefixItems;
+    }
+
+    if (Array.isArray(clean.items)) {
+      clean.items = {};
+    }
+
+    if (clean.type === 'array' && !clean.items) {
+      clean.items = {};
+    }
+
+    if (clean.properties && typeof clean.properties === 'object') {
+      clean.properties = Object.fromEntries(
+        Object.entries(clean.properties).map(([k, v]) => [k, this.sanitizeJsonSchemaForOpenAI(v)])
+      );
+    }
+
+    if (clean.patternProperties && typeof clean.patternProperties === 'object') {
+      clean.patternProperties = Object.fromEntries(
+        Object.entries(clean.patternProperties).map(([k, v]) => [k, this.sanitizeJsonSchemaForOpenAI(v)])
+      );
+    }
+
+    if (clean.items && typeof clean.items === 'object' && !Array.isArray(clean.items)) {
+      clean.items = this.sanitizeJsonSchemaForOpenAI(clean.items);
+    }
+
+    if (clean.additionalProperties && typeof clean.additionalProperties === 'object') {
+      clean.additionalProperties = this.sanitizeJsonSchemaForOpenAI(clean.additionalProperties);
+    }
+
+    for (const comb of ['anyOf', 'allOf', 'oneOf']) {
+      if (Array.isArray(clean[comb])) {
+        clean[comb] = clean[comb].map((item: unknown) => this.sanitizeJsonSchemaForOpenAI(item));
+      }
+    }
+
+    if (clean.$defs && typeof clean.$defs === 'object') {
+      clean.$defs = Object.fromEntries(
+        Object.entries(clean.$defs).map(([k, v]) => [k, this.sanitizeJsonSchemaForOpenAI(v)])
+      );
+    }
+
+    if (clean.definitions && typeof clean.definitions === 'object') {
+      clean.definitions = Object.fromEntries(
+        Object.entries(clean.definitions).map(([k, v]) => [k, this.sanitizeJsonSchemaForOpenAI(v)])
+      );
+    }
+
+    return clean;
+  }
+
+  translateOpenAIStreamChunkToAnthropic(
+    chunk: OpenAIStreamChunk,
+    providerNameOrState?: string | StreamTranslationState,
+    state?: StreamTranslationState
+  ): AnthropicStreamEvent[] {
+    const streamState = (typeof providerNameOrState === 'object' ? providerNameOrState : state) || this.createStreamState();
     const events: AnthropicStreamEvent[] = [];
-    const choice = chunk.choices[0];
+    const choice = chunk.choices?.[0];
     if (!choice) return events;
 
-    if (choice.delta.role && choice.delta.role === 'assistant') {
+    if (!streamState.messageStartSent) {
       events.push({
         type: 'message_start',
         message: {
-          id: `msg_${Date.now()}`,
+          id: chunk.id || `msg_${Date.now()}`,
           type: 'message',
           role: 'assistant',
           content: [],
@@ -238,50 +321,103 @@ export class FormatTranslator {
           usage: { input_tokens: 0, output_tokens: 0 },
         },
       });
-      events.push({
-        type: 'content_block_start',
-        index: 0,
-        message: undefined,
-      });
+      streamState.messageStartSent = true;
     }
 
-    if (choice.delta.tool_calls) {
-      for (const tc of choice.delta.tool_calls) {
-        if (tc.id && tc.type === 'function') {
+    const delta = choice.delta;
+
+    if (delta?.tool_calls) {
+      for (const tc of delta.tool_calls) {
+        if (tc.id && tc.function?.name) {
+          if (streamState.contentBlockOpen) {
+            events.push({
+              type: 'content_block_stop',
+              index: streamState.contentBlockIndex,
+            });
+            streamState.contentBlockIndex++;
+            streamState.contentBlockOpen = false;
+          }
+          const anthropicBlockIndex = streamState.contentBlockIndex;
+          streamState.toolCalls[tc.index] = {
+            id: tc.id,
+            name: tc.function.name,
+            anthropicBlockIndex,
+          };
           events.push({
             type: 'content_block_start',
-            index: 0,
-            message: undefined,
-          });
-          events.push({
-            type: 'content_block_delta',
-            index: 0,
-            delta: {
-              type: 'tool_use_delta',
-              ...(tc.id ? { id: tc.id } : {}),
-              ...(tc.function?.name ? { name: tc.function.name } : {}),
-              ...(tc.function?.arguments ? { arguments: tc.function.arguments } : {}),
+            index: anthropicBlockIndex,
+            content_block: {
+              type: 'tool_use',
+              id: tc.id,
+              name: tc.function.name,
+              input: {},
             },
           });
+          streamState.contentBlockOpen = true;
+          streamState.currentBlockType = 'tool_use';
+        }
+        if (tc.function?.arguments) {
+          const tcInfo = streamState.toolCalls[tc.index];
+          if (tcInfo) {
+            events.push({
+              type: 'content_block_delta',
+              index: tcInfo.anthropicBlockIndex,
+              delta: {
+                type: 'input_json_delta',
+                partial_json: tc.function.arguments,
+              },
+            });
+          }
         }
       }
-    } else if (choice.delta.content) {
+    } else if (delta?.content) {
+      if (streamState.contentBlockOpen && streamState.currentBlockType !== 'text') {
+        events.push({
+          type: 'content_block_stop',
+          index: streamState.contentBlockIndex,
+        });
+        streamState.contentBlockIndex++;
+        streamState.contentBlockOpen = false;
+      }
+      if (!streamState.contentBlockOpen) {
+        events.push({
+          type: 'content_block_start',
+          index: streamState.contentBlockIndex,
+          content_block: {
+            type: 'text',
+            text: '',
+          },
+        });
+        streamState.contentBlockOpen = true;
+        streamState.currentBlockType = 'text';
+      }
       events.push({
         type: 'content_block_delta',
-        index: 0,
+        index: streamState.contentBlockIndex,
         delta: {
           type: 'text_delta',
-          text: choice.delta.content,
+          text: delta.content,
         },
       });
     }
 
     if (choice.finish_reason) {
+      if (streamState.contentBlockOpen) {
+        events.push({
+          type: 'content_block_stop',
+          index: streamState.contentBlockIndex,
+        });
+        streamState.contentBlockOpen = false;
+      }
       events.push({
         type: 'message_delta',
         delta: {
           type: 'message_delta',
           stop_reason: this.mapFinishReason(choice.finish_reason),
+          stop_sequence: null,
+        },
+        usage: {
+          output_tokens: 0,
         },
       });
       events.push({ type: 'message_stop' });
@@ -297,7 +433,7 @@ export class FormatTranslator {
       case 'message_start': {
         if (event.message) {
           chunks.push({
-            id: event.message.id,
+            id: event.message.id || `msg_${Date.now()}`,
             choices: [
               {
                 index: 0,
@@ -352,22 +488,32 @@ export class FormatTranslator {
     return chunks;
   }
 
-  private flattenContent(blocks: AnthropicContentBlock[]): string {
-    return blocks.map((block) => block.text).join('');
+  private flattenContent(blocks: AnthropicContentBlock[] | string | unknown): string {
+    if (typeof blocks === 'string') return blocks;
+    if (Array.isArray(blocks)) {
+      return blocks
+        .map((b) => {
+          if (typeof b === 'string') return b;
+          if (b && typeof b === 'object' && 'text' in b && typeof b.text === 'string') return b.text;
+          return '';
+        })
+        .join('');
+    }
+    return '';
   }
 
   private mapFinishReason(reason: string): string {
     switch (reason) {
       case 'stop':
-        return 'stop';
+        return 'end_turn';
       case 'length':
-        return 'length';
+        return 'max_tokens';
       case 'content_filter':
-        return 'content_filter';
+        return 'stop_sequence';
       case 'tool_calls':
-        return 'tool_calls';
+        return 'tool_use';
       default:
-        return 'stop';
+        return 'end_turn';
     }
   }
 

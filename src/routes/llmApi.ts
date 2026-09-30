@@ -30,6 +30,11 @@ export function createLLMApiRouter(providerProxy: ProviderProxy, config: Config)
     if (providerType === 'openai') {
       req.body = providerProxy['translator'].anthropicToOpenAIRequest(req.body as any, req.provider!.name);
       logger.debug('Translated Anthropic → OpenAI for /v1/messages');
+    } else if (req.body?.tools && Array.isArray(req.body.tools)) {
+      req.body.tools = req.body.tools.map((tool: any) => ({
+        ...tool,
+        input_schema: providerProxy['translator'].sanitizeJsonSchemaForOpenAI(tool.input_schema),
+      }));
     }
 
     await providerProxy.forwardRequest(req, res);
