@@ -1,8 +1,8 @@
 server:
   host: 127.0.0.1
-  llmPort: 8080
-  adminPort: 3001
-  uiPort: 3000
+  llmPort: ${LLM_PORT:-12000}
+  adminPort: ${ADMIN_PORT:-12001}
+  uiPort: ${UI_PORT:-13000}
   adminApiKey: ${ADMIN_API_KEY}
 
 clients:
@@ -39,20 +39,26 @@ providers:
 
   kilo:
     type: openai
-    apiKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbnYiOiJwcm9kdWN0aW9uIiwia2lsb1VzZXJJZCI6IjczOWMxMWE2LTQ0OGMtNDBlYy1hYWYyLTVjNWQ5NDFhNWNhOSIsImFwaVRva2VuUGVwcGVyIjpudWxsLCJ2ZXJzaW9uIjozLCJpYXQiOjE3ODc1MTc5NzMsImV4cCI6MTk0NTE5Nzk3M30.Fd8J7AQcky1c05W-ibUBjkeB3oTuadpy3Ezja6oAZvc"
+    apiKey: ${KILO_API_KEY}
     baseURL: https://api.kilo.ai/api/gateway
+
+  groq:
+    type: openai
+    apiKey: ${GROQ_API_KEY}
+    baseURL: https://api.groq.com/openai
 
 modelRouting:
 # OpenRouter
+# Select replacements here: https://openrouter.ai/models?q=free
   - name: free-random
     provider: openrouter
     model: openrouter/free
   - name: free-high
     provider: openrouter
-    model: stealth/ox-alpha
+    model: nvidia/nemotron-3.5-lightning:free
   - name: free-medium
     provider: openrouter
-    model: nvidia/nemotron-3.5-lightning:free
+    model: thinkingmachines/inkling:free
 
 # Claude
   - name: claude-3-5-sonnet-latest
@@ -70,7 +76,7 @@ modelRouting:
     provider: copilot
     model: auto
 
-#  Local
+# Local
   - name: local
     provider: lmstudio
     model: available
@@ -87,15 +93,17 @@ modelRouting:
   - name: kilo-frontier # Paid only
     provider: kilo
     model: kilo-auto/frontier
-  - name: kilo-balanced
+  - name: kilo-balanced # Paid only
     provider: kilo
     model: kilo-auto/balanced
-  - name: kilo-efficient
+  - name: kilo-efficient # Paid only
     provider: kilo
     model: kilo-auto/efficient
 
-    
-
+# Groq
+  - name: groq-free
+    provider: groq
+    model: groq/compound
 
 sessions:
   file: sessions.json

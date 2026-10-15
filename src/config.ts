@@ -37,9 +37,9 @@ export function loadConfig(configPath: string): Config {
   const resolvedConfig: Config = {
     server: {
       host: resolveEnv(server.host as string, '127.0.0.1'),
-      llmPort: Number(server.llmPort) || 8080,
-      adminPort: Number(server.adminPort) || 3001,
-      uiPort: Number(server.uiPort) || 3000,
+      llmPort: Number(resolveEnv(server.llmPort as string, '12000')) || 12000,
+      adminPort: Number(resolveEnv(server.adminPort as string, '12001')) || 12001,
+      uiPort: Number(resolveEnv(server.uiPort as string, '13000')) || 13000,
       adminApiKey: server.adminApiKey !== undefined ? resolveEnv(server.adminApiKey as string) : undefined,
     },
     clients: clients.map((client, index) => ({
@@ -93,12 +93,18 @@ function resolveEnv(value: string, defaultValue?: string): string {
 
   const envVarMatch = value.match(/^\$\{([^}]+)\}$/);
   if (envVarMatch) {
-    const envVarName = envVarMatch[1];
+    const raw = envVarMatch[1];
+    const parts = raw.split(':');
+    const envVarName = parts[0];
+    const envDefault = parts.length > 1 ? parts.slice(1).join(':') : undefined;
     const envValue = process.env[envVarName];
-    if (envValue === undefined || envValue === '') {
-      throw new Error(`Environment variable '${envVarName}' is not set or empty`);
+    if (envValue !== undefined && envValue !== '') {
+      return envValue;
     }
-    return envValue;
+    if (envDefault !== undefined) {
+      return envDefault;
+    }
+    throw new Error(`Environment variable '${envVarName}' is not set or empty`);
   }
 
   return value;
